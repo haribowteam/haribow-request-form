@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HARIBOW Admin</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f8fb;
+      color: #111827;
+      margin: 0;
+      padding: 24px;
+    }
+
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    h1 {
+      margin: 0 0 18px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 20px;
+    }
+
+    label {
+      display: block;
+      margin: 12px 0 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input, select, button {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    button {
+      margin-top: 16px;
+      background: #111827;
+      color: #fff;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .week-row {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0;
+    }
+
+    .team-buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .team-btn {
+      width: auto;
+      min-width: 40px;
+      padding: 8px 10px;
+      background: #f3f4f6;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+
+    .team-btn.active {
+      background: #111827;
+      color: #fff;
+    }
+
+    .status {
+      margin-top: 12px;
+      color: #2563eb;
+      font-size: 14px;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>HARIBOW Admin</h1>
+
+    <div class="card">
+      <h2>Capacity Input</h2>
+
+      <div class="grid">
+        <div>
+          <label>Year</label>
+          <select id="capYear"></select>
+        </div>
+        <div>
+          <label>Month</label>
+          <select id="capMonth"></select>
+        </div>
+      </div>
+
+      <label>Apply to all weeks</label>
+      <div class="team-buttons" id="applyAll"></div>
+
+      <div id="weeks"></div>
+
+      <button onclick="saveCapacity()">Save Capacity</button>
+      <div class="status" id="capacityStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Booking Input</h2>
+
+      <label>Title</label>
+      <input id="bookingTitle" placeholder="Germany Tour" />
+
+      <div class="grid">
+        <div>
+          <label>Start Date</label>
+          <input id="bookingStart" type="date" />
+        </div>
+        <div>
+          <label>End Date</label>
+          <input id="bookingEnd" type="date" />
+        </div>
+      </div>
+
+      <label>Teams Used</label>
+      <select id="bookingTeams">
+        <option value="1">1 team</option>
+        <option value="2">2 teams</option>
+        <option value="3">3 teams</option>
+        <option value="4">4 teams</option>
+      </select>
+
+      <label>Updated By</label>
+      <input id="bookingBy" placeholder="Koki" />
+
+      <button onclick="checkBooking()">Check Capacity</button>
+      <button onclick="saveBooking()">Save Booking</button>
+
+      <div class="status" id="bookingStatus"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "/api/admin";
+    const capacities = {};
+    const maxTeams = 6;
+
+    function init() {
+      const year = new Date().getFullYear();
+
+      const yearSel = document.getElementById("capYear");
+      for (let y = year; y <= year + 2; y++) {
+        yearSel.innerHTML += `<option value="${y}">${y}</option>`;
+      }
+
+      const monthSel = document.getElementById("capMonth");
+      for (let m = 1; m <= 12; m++) {
+        monthSel.innerHTML += `<option value="${m}">${m}</option>`;
+      }
+      monthSel.value = new Date().getMonth() + 1;
+
+      yearSel.addEventListener("change", renderWeeks);
+      monthSel.addEventListener("change", renderWeeks);
+
+      renderApplyAll();
+      renderWeeks();
+    }
+
+    function renderApplyAll() {
+      const el = document.getElementById("applyAll");
+      el.innerHTML = "";
+
+      for (let n = 0; n <= maxTeams; n++) {
+        const btn = document.createElement("button");
+        btn.className = "team-btn";
+        btn.textContent = n;
+        btn.type = "button";
+        btn.onclick = () => {
+          for (let w = 1; w <= 5; w++) capacities[w] = n;
+          renderWeeks();
+        };
+        el.appendChild(btn);
+      }
+    }
+
+    function renderWeeks() {
+      const el = document.getElementById("weeks");
+      el.innerHTML = "";
+
+      for (let w = 1; w <= 5; w++) {
+        if (capacities[w] === undefined) capacities[w] = 0;
+
+        const row = document.createElement("div");
+        row.className = "week-row";
+
+        const label = document.createElement("div");
+        label.textContent = `Week ${w}`;
+
+        const buttons = document.createElement("div");
+        buttons.className = "team-buttons";
+
+        for (let n = 0; n <= maxTeams; n++) {
+          const btn = document.createElement("button");
+          btn.className = "team-btn" + (capacities[w] === n ? " active" : "");
+          btn.textContent = n;
+          btn.type = "button";
+          btn.onclick = () => {
+            capacities[w] = n;
+            renderWeeks();
+          };
+          buttons.appendChild(btn);
+        }
+
+        row.appendChild(label);
+        row.appendChild(buttons);
+        el.appendChild(row);
+      }
+    }
+
+    async function saveCapacity() {
+      const payload = {
+        action: "save_capacity",
+        year: document.getElementById("capYear").value,
+        month: document.getElementById("capMonth").value,
+        weeks: Object.entries(capacities).map(([week_no, base_capacity]) => ({
+          week_no,
+          base_capacity
+        })),
+        updated_by: "HARIBOW"
+      };
+
+      const result = await post(payload);
+      document.getElementById("capacityStatus").textContent =
+        result.ok ? "Capacity saved." : "Error: " + result.error;
+    }
+
+    async function checkBooking() {
+      const payload = getBookingPayload("check_booking");
+      const result = await post(payload);
+      document.getElementById("bookingStatus").textContent =
+        result.ok ? result.message : "Error: " + result.error;
+    }
+
+    async function saveBooking() {
+      const payload = getBookingPayload("save_booking");
+      const result = await post(payload);
+      document.getElementById("bookingStatus").textContent =
+        result.ok ? "Booking saved." : "Error: " + result.error;
+    }
+
+    function getBookingPayload(action) {
+      return {
+        action,
+        title: document.getElementById("bookingTitle").value,
+        start_date: document.getElementById("bookingStart").value,
+        end_date: document.getElementById("bookingEnd").value,
+        teams_used: document.getElementById("bookingTeams").value,
+        updated_by: document.getElementById("bookingBy").value || "HARIBOW"
+      };
+    }
+
+    async function post(payload) {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    }
+
+    init();
+  </script>
+</body>
+</html>
