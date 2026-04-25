@@ -260,19 +260,45 @@
     }
 
     async function checkBooking() {
+      const validationError = validateBookingForm();
+      if (validationError) {
+        document.getElementById("bookingStatus").textContent = "Error: " + validationError;
+        return;
+      }
+    
       const payload = getBookingPayload("check_booking");
       const result = await post(payload);
+    
       document.getElementById("bookingStatus").textContent =
         result.ok ? result.message : "Error: " + result.error;
     }
 
     async function saveBooking() {
-      const payload = getBookingPayload("save_booking");
-      const result = await post(payload);
+      const validationError = validateBookingForm();
+      if (validationError) {
+        document.getElementById("bookingStatus").textContent = "Error: " + validationError;
+        return;
+      }
+    
+      document.getElementById("bookingStatus").textContent = "Checking capacity...";
+    
+      const checkPayload = getBookingPayload("check_booking");
+      const checkResult = await post(checkPayload);
+    
+      if (!checkResult.ok) {
+        document.getElementById("bookingStatus").textContent = "Error: " + checkResult.error;
+        return;
+      }
+    
+      const okToSave = confirm(checkResult.message + "\n\nSave this booking?");
+      if (!okToSave) return;
+    
+      const savePayload = getBookingPayload("save_booking");
+      const result = await post(savePayload);
+    
       document.getElementById("bookingStatus").textContent =
         result.ok ? "Booking saved." : "Error: " + result.error;
     }
-
     function getBookingPayload(action) {
       return {
         action,
@@ -282,6 +308,21 @@
         teams_used: document.getElementById("bookingTeams").value,
         updated_by: document.getElementById("bookingBy").value || "HARIBOW"
       };
+    }
+
+    function validateBookingForm() {
+      const title = document.getElementById("bookingTitle").value.trim();
+      const start = document.getElementById("bookingStart").value;
+      const end = document.getElementById("bookingEnd").value;
+      const teams = Number(document.getElementById("bookingTeams").value);
+    
+      if (!title) return "Title is required.";
+      if (!start) return "Start date is required.";
+      if (!end) return "End date is required.";
+      if (new Date(end) < new Date(start)) return "End date must be on or after start date.";
+      if (!teams || teams < 1) return "Teams used must be at least 1.";
+    
+      return "";
     }
 
     async function post(payload) {
